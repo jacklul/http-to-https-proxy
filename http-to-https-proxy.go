@@ -18,6 +18,7 @@ var proxyBufferSize = 4096
 var httpListenPort = 80
 var httpsConnectingPort = 443
 var allowInsecure = false
+var allowQuery = false
 var debugLog = false
 
 func handler(responseToRequest http.ResponseWriter, incomingRequest *http.Request) {
@@ -25,6 +26,33 @@ func handler(responseToRequest http.ResponseWriter, incomingRequest *http.Reques
 	host := incomingRequest.Host
 	url := incomingRequest.URL
 	remote := incomingRequest.RemoteAddr
+
+	if allowQuery {
+		query := incomingRequest.URL.Query()
+
+		if len(query.Get("q")) > 0 {
+			parsedUrl, err := url.Parse(query.Get("q"))
+			if err != nil {
+				log.Printf("cannot parse URL (%s) %s", url, err)
+				http.Error(responseToRequest, "Cannot parse URL", http.StatusBadRequest)
+			}
+			query.Del("q")
+
+			host = parsedUrl.Hostname()
+			url = parsedUrl.JoinPath()
+			port := parsedUrl.Port()
+
+			if len(port) > 0 {
+				host = host + ":" + port
+			}
+
+			incomingRequest.Host = host
+			incomingRequest.URL = url
+			incomingRequest.RequestURI = parsedUrl.Path
+		}
+	}
+
+	//log.Printf("%+v\n", incomingRequest)
 
 	log.Printf("Request from %s to host %s and url %s", remote, host, url)
 
@@ -129,6 +157,7 @@ func main() {
 	var parsedHTTPSPort *int = parser.Int("c", "connect", &argparse.Options{Help: "HTTPS port to connect to", Default: httpsConnectingPort})
 	var parsedProxyBuffer *int = parser.Int("b", "buffer", &argparse.Options{Help: "Buffer size", Default: proxyBufferSize})
 	var parsedAllowInsecure *bool = parser.Flag("i", "insecure", &argparse.Options{Help: "Allow insecure TLS certificates", Default: allowInsecure})
+	var parsedAllowQuery *bool = parser.Flag("q", "query", &argparse.Options{Help: "Handle requests from query string \"q\"", Default: allowQuery})
 	var parsedDebugLog *bool = parser.Flag("d", "debug", &argparse.Options{Help: "Enable debug console logging", Default: debugLog})
 
 	err := parser.Parse(os.Args)
@@ -140,12 +169,17 @@ func main() {
 	httpsConnectingPort = int(*parsedHTTPSPort)
 	proxyBufferSize = int(*parsedProxyBuffer)
 	allowInsecure = bool(*parsedAllowInsecure)
+	allowQuery = bool(*parsedAllowQuery)
 	debugLog = bool(*parsedDebugLog)
 
 	log.Printf("HTTP to HTTPS proxy %s listening to %d, forward to %d with listening buffer %d", versionCode, httpListenPort, httpsConnectingPort, proxyBufferSize)
 
 	if allowInsecure {
 		log.Printf("Allow insecure TLS certificates")
+	}
+
+	if allowQuery {
+		log.Printf("Allow requests through query string")
 	}
 
 	http.HandleFunc("/", handler)
