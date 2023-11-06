@@ -15,12 +15,40 @@ var proxyBufferSize = 4096
 var httpListenPort = 80
 var httpsConnectingPort = 443
 var allowInsecure = false
+var allowQuery = false
 
 func handler(responseToRequest http.ResponseWriter, incomingRequest *http.Request) {
 
 	host := incomingRequest.Host
 	url := incomingRequest.URL
 	remote := incomingRequest.RemoteAddr
+
+	if allowQuery {
+		query := incomingRequest.URL.Query()
+
+		if len(query.Get("q")) > 0 {
+			parsedUrl, err := url.Parse(query.Get("q"))
+			if err != nil {
+				log.Printf("cannot parse URL (%s) %s", url, err)
+				http.Error(responseToRequest, "Cannot parse URL", http.StatusBadRequest)
+			}
+			query.Del("q")
+
+			host = parsedUrl.Hostname()
+			url = parsedUrl.JoinPath()
+			port := parsedUrl.Port()
+
+			if len(port) > 0 {
+				host = host + ":" + port
+			}
+
+			incomingRequest.Host = host
+			incomingRequest.URL = url
+			incomingRequest.RequestURI = parsedUrl.Path
+		}
+	}
+
+	//log.Printf("%+v\n", incomingRequest)
 
 	log.Printf("Request from %s to host %s and url %s", remote, host, url)
 
@@ -115,6 +143,8 @@ func main() {
 	for _, arg := range os.Args[1:] {
 		if arg == "-i" {
 			allowInsecure = true
+		} else if arg == "-q" {
+			allowQuery = true
 		}
 	}
 
@@ -149,6 +179,10 @@ func main() {
 
 	if allowInsecure {
 		log.Printf("Allow insecure TLS certificates")
+	}
+
+	if allowQuery {
+		log.Printf("Allow requests through query string")
 	}
 
 	log.Printf("You can supply the listening port, forward port, buffer size, insecure -i cert as command line args")

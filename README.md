@@ -37,6 +37,8 @@ http-to-https-proxy.exe -i
 ```
 If the server you are connecting to is using expired/insecure TLS certificates. You can add `-i` argument to allow those connections.
 
+Add `-q` argument to make it act like CGI proxy which accepts target URL in `?q=` query parameter.
+
 # Compiling
 
 Just install the latest Go compiler for your platform. The latest at the time of writing is `1.20.5`. THe following was compiled on windows/amd64 platform using Powershell script `build.ps1`.
