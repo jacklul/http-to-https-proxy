@@ -8,6 +8,8 @@ import (
 	"net/http/httputil"
 	"os"
 	"strconv"
+
+	"github.com/akamensky/argparse"
 )
 
 var versionCode = "v0.3"
@@ -15,6 +17,7 @@ var proxyBufferSize = 4096
 var httpListenPort = 80
 var httpsConnectingPort = 443
 var allowInsecure = false
+var debugLog = false
 
 func handler(responseToRequest http.ResponseWriter, incomingRequest *http.Request) {
 
@@ -33,8 +36,9 @@ func handler(responseToRequest http.ResponseWriter, incomingRequest *http.Reques
 
 	//ioutil.WriteFile("input.txt", requestDump, 0644)
 
-	// You can uncomment to view the raw http request for debugging
-	//log.Printf("Dump:\n%s", string(requestDump))
+	if debugLog {
+		log.Printf("Dump:\n%s\n", string(requestDump))
+	}
 
 	conf := &tls.Config{}
 
@@ -109,49 +113,30 @@ func handler(responseToRequest http.ResponseWriter, incomingRequest *http.Reques
 }
 
 func main() {
+	parser := argparse.NewParser("http-to-https-proxy", "A proxy that upgrades HTTP connections to HTTPS for systems which cannot make HTTPS requests.")
 
-	argsWithoutProg := os.Args[1:]
+	var parsedHTTPPort *int = parser.Int("l", "listen", &argparse.Options{Help: "HTTP port to listen on", Default: httpListenPort})
+	var parsedHTTPSPort *int = parser.Int("c", "connect", &argparse.Options{Help: "HTTPS port to connect to", Default: httpsConnectingPort})
+	var parsedProxyBuffer *int = parser.Int("b", "buffer", &argparse.Options{Help: "Buffer size", Default: proxyBufferSize})
+	var parsedAllowInsecure *bool = parser.Flag("i", "insecure", &argparse.Options{Help: "Allow insecure TLS certificates", Default: allowInsecure})
+	var parsedDebugLog *bool = parser.Flag("d", "debug", &argparse.Options{Help: "Enable debug console logging", Default: debugLog})
 
-	for _, arg := range os.Args[1:] {
-		if arg == "-i" {
-			allowInsecure = true
-		}
+	err := parser.Parse(os.Args)
+	if err != nil {
+		log.Print(parser.Usage(err))
 	}
 
-	if len(argsWithoutProg) >= 3 {
-		parsedHTTPPort, err := strconv.ParseInt(argsWithoutProg[0], 10, 32)
-
-		if err != nil {
-			log.Printf("Cannot parse argument %s", argsWithoutProg[0])
-			return
-		}
-
-		parsedHTTPSPort, err := strconv.ParseInt(argsWithoutProg[1], 10, 32)
-
-		if err != nil {
-			log.Printf("Cannot parse argument %s", argsWithoutProg[1])
-			return
-		}
-
-		parsedProxyBuffer, err := strconv.ParseInt(argsWithoutProg[2], 10, 32)
-
-		if err != nil {
-			log.Printf("Cannot parse argument %s", argsWithoutProg[2])
-			return
-		}
-
-		httpListenPort = int(parsedHTTPPort)
-		httpsConnectingPort = int(parsedHTTPSPort)
-		proxyBufferSize = int(parsedProxyBuffer)
-	}
+	httpListenPort = int(*parsedHTTPPort)
+	httpsConnectingPort = int(*parsedHTTPSPort)
+	proxyBufferSize = int(*parsedProxyBuffer)
+	allowInsecure = bool(*parsedAllowInsecure)
+	debugLog = bool(*parsedDebugLog)
 
 	log.Printf("HTTP to HTTPS proxy %s listening to %d, forward to %d with listening buffer %d", versionCode, httpListenPort, httpsConnectingPort, proxyBufferSize)
 
 	if allowInsecure {
 		log.Printf("Allow insecure TLS certificates")
 	}
-
-	log.Printf("You can supply the listening port, forward port, buffer size, insecure -i cert as command line args")
 
 	http.HandleFunc("/", handler)
 
