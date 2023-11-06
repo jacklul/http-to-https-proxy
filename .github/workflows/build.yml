@@ -1,0 +1,33 @@
+name: Build and prepare release
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-go@v4
+      with:
+        go-version: 'stable'
+
+    - run: bash build.sh
+
+    - uses: softprops/action-gh-release@v1
+      if: ${{ startsWith(github.ref, 'refs/tags/') }}
+      with:
+        draft: true
+        files: |
+          http-to-https-proxy-*
+
+    - uses: actions/upload-artifact@v3
+      if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      with:
+        name: http-to-https-proxy-${{ github.ref_name }}
+        path: |
+          http-to-https-proxy-*
