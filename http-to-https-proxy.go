@@ -13,7 +13,7 @@ import (
 	"github.com/akamensky/argparse"
 )
 
-var versionCode = "v0.3"
+var versionCode = "v0.4-unofficial"
 var proxyBufferSize = 4096
 var httpListenPort = 80
 var httpsConnectingPort = 443
