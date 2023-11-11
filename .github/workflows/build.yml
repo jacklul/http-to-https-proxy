@@ -3,7 +3,8 @@ name: Build and prepare release
 on:
   push:
     tags:
-      - "*.*.*"
+      - "v*.*"
+      - "v*.*-unofficial"
   workflow_dispatch:
 
 jobs:
